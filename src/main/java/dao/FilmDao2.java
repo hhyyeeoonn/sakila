@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 import vo.Film;
 
-public class FilmDao {
+public class FilmDao2 {
 	
 	//release_year의 최소값
 	public int selectMinReleaseYear() {
@@ -18,15 +18,95 @@ public class FilmDao {
 		ResultSet rs = null;
 		
 		try {
-			Class.forName("org.mariadb.jdbc.Driver");
-			conn = DriverManager.getConnection("jdbc:mariadb://localhost:3306/sakila", "root", "java1234");
-			String sql = "SELECT MIN(release_year) y FROM film";
-	        stmt = conn.prepareStatement(sql);
-	        rs = stmt.executeQuery();
-	        if(rs.next()) {
-	        	minYear = rs.getInt("y"); // rs.getInt(1)
-	        }
 			
+		} catch(Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				Class.forName("ord.mariadb.jdbc.Driver");
+				conn = DriverManager.getConnection("jdbc:mariadb://lacalhost:3306/sakila", "root", "java1234");
+				String sql = "SELECT MIN(release_year) y FROM film";
+		        stmt = conn.prepareStatement(sql);
+		        rs = stmt.executeQuery();
+		        if(rs.next()) {
+		        	minYear = rs.getInt("y"); // rs.getInt(1)
+		        }
+				
+			} catch(Exception e) {
+				e.printStackTrace();
+			} finally {
+				try {
+					conn.close();
+					stmt.close();
+					rs.close();
+				} catch(Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return minYear;
+	}
+	
+	
+	
+	public ArrayList<Film> filmSearchList(int fromMinute, int toMinute, String[] rating, String searchTitle) {
+		ArrayList<Film> list = new ArrayList<Film>();
+		Connection conn = null;
+		PreparedStatement stmt = null;
+		ResultSet rs = null;
+		String sql = "";
+		String word1 = "";
+		String word2 = ""; // title like ?
+		String word3 = ""; // rating IN(?)
+		String where = " WHERE";
+		String and = " AND";
+		if(fromMinute != 0 && toMinute != 0) {
+			word1 = " length between " + fromMinute + " AND " + toMinute;
+			
+		} 
+		if(searchTitle != null) {
+			word2 = " title like ?";
+		}
+		if(rating.length == 4) {
+			word3 = " rating IN (?, ?, ?, ?))";
+		} else if(rating.length == 3) {
+			word3 = " rating IN (?, ?, ?))";
+		} else if(rating.length == 2) {
+			word3 = " rating IN (?, ?))";
+		} else if(rating.length == 1) {
+			word3 = " rating IN (?))";
+		}
+			System.out.println("FilmDao:"+word1+word2+word3);
+		
+		try { 
+			Class.forName("ord.mariadb.jdbc.Driver");
+			conn = DriverManager.getConnection("jdbc:mariadb://lacalhost:3306/sakila", "root", "java1234");
+			
+			if(word1.equals("") && word2.equals("") && word3.equals("")) {
+				sql = "SELECT * FROM film ORDER BY film_no";
+			} else if(word1.equals("") && word2.equals("")) {
+				sql = "SELECT * FROM film"+where+word3+" ORDER BY film_no";
+			} else if(word1.equals("") && word3.equals("")) {
+				sql = "SELECT * FROM film"+where+word2+" ORDER BY film_no";
+			} else if(word2.equals("") && word3.equals("")) {
+				sql = "SELECT * FROM film"+where+word1+" ORDER BY film_no";
+			} else {
+				// WHERE 1>0 WHERE가 참이면 다 출력해라
+				sql = "SELECT * FROM film"+where+word1+and+word2+and+word3+" ORDER BY film_no"; 
+			}
+			stmt = conn.prepareStatement(sql);
+			if(word1.equals("")) {
+				
+			}
+			rs = stmt.executeQuery();
+			while(rs.next()) {
+				Film f = new Film();
+				f.setFilmId(rs.getInt("film_id"));
+				f.setTitle(rs.getString("title"));
+				f.setRating(rs.getString("rating"));
+				f.setLength(rs.getInt("length"));
+				list.add(f);
+			}
 		} catch(Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -38,13 +118,26 @@ public class FilmDao {
 				e.printStackTrace();
 			}
 		}
-		System.out.println("FilmDao:"+minYear);
-		return minYear;
+		return list;
 	}
-		
-	// rating : String[] 여러개의 등급
-	public ArrayList<Film> selectFilmList2(int releaseYear, String searchTitle, String[] rating, int fromMinute, int toMinute) {
+	
+	
+	
+	//  rating : String[] 여러개의 등급
+	public ArrayList<Film> selectFilmList2(String[] rating) {
 		ArrayList<Film> list = new ArrayList<Film>();
+		String sql = "";
+		if(rating == null || rating.length == 5) {
+			sql = "SELECT * FROM film";
+		} else if(rating.length == 4) {
+			sql = "SELECT * FROM film WHERE rating IN (?, ?, ?, ?)";
+		} else if(rating.length == 3) {
+			sql = "SELECT * FROM film WHERE rating IN (?, ?, ?)";
+		} else if(rating.length == 2) {
+			sql = "SELECT * FROM film WHERE rating IN (?, ?)";
+		} else if(rating.length == 1) {
+			sql = "SELECT * FROM film WHERE rating IN (?)";
+		}
 		
 		Connection conn = null;
 		PreparedStatement stmt = null;
@@ -52,205 +145,10 @@ public class FilmDao {
 		try {
 			Class.forName("org.mariadb.jdbc.Driver");
 			conn = DriverManager.getConnection("jdbc:mariadb://localhost:3306/sakila", "root", "java1234");
-			String sql = "";
-			
-			if(releaseYear != 0) { // 출시 연도:O
-				if(toMinute > fromMinute) { // 출시 연도:O 상영등급:O 상영시간:O between ... and .... 필요
-					if(rating == null || rating.length == 5) {
-						sql = "SELECT * FROM film WHERE title like ? AND"
-								+ " length BETWEEN ? AND ? AND"
-								+ " release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setInt(2, fromMinute);
-						stmt.setInt(3, toMinute);
-						stmt.setInt(4, releaseYear);
-					} else if(rating.length == 4) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?, ?)"
-								+ " AND length BETWEEN ? AND ?"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setString(5, rating[3]);
-						stmt.setInt(6, fromMinute);
-						stmt.setInt(7, toMinute);
-						stmt.setInt(8, releaseYear);
-					} else if(rating.length == 3) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?)"
-								+ " AND length BETWEEN ? AND ?"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setInt(5, fromMinute);
-						stmt.setInt(6, toMinute);
-						stmt.setInt(7, releaseYear);
-					} else if(rating.length == 2) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?)"
-								+ " AND length BETWEEN ? AND ?"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setInt(4, fromMinute);
-						stmt.setInt(5, toMinute);
-						stmt.setInt(6, releaseYear);
-					} else if(rating.length == 1) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?)"
-								+ " AND length BETWEEN ? AND ?"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setInt(3, fromMinute);
-						stmt.setInt(4, toMinute);
-						stmt.setInt(5, releaseYear);
-					} 
-				} else { // 출시 연도:O 상영등급:O 상영시간:X // between ... and .... 불필요
-					if(rating == null || rating.length == 5) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setInt(2, releaseYear);
-					} else if(rating.length == 4) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?, ?)"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setString(5, rating[3]);
-						stmt.setInt(6, releaseYear);
-					} else if(rating.length == 3) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?)"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setInt(5, releaseYear);
-					} else if(rating.length == 2) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?)"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setInt(4, releaseYear);
-					} else if(rating.length == 1) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?)"
-								+ " AND release_year = ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setInt(3, releaseYear);
-					} 
-				}
-			} else { // 출시 연도:X
-				if(toMinute > fromMinute) { // 출시 연도:X 상영등급:X 상영시간:O // between ... and .... 필요
-					if(rating == null || rating.length == 5) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND length BETWEEN ? AND ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setInt(2, fromMinute);
-						stmt.setInt(3, toMinute);
-					} else if(rating.length == 4) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?, ?)"
-								+ " AND length BETWEEN ? AND ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setString(5, rating[3]);
-						stmt.setInt(6, fromMinute);
-						stmt.setInt(7, toMinute);
-					} else if(rating.length == 3) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?)"
-								+ " AND length BETWEEN ? AND ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setInt(5, fromMinute);
-						stmt.setInt(6, toMinute);
-					} else if(rating.length == 2) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?)"
-								+ " AND length BETWEEN ? AND ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setInt(4, fromMinute);
-						stmt.setInt(5, toMinute);
-					} else if(rating.length == 1) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?)"
-								+ " AND length BETWEEN ? AND ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setInt(3, fromMinute);
-						stmt.setInt(4, toMinute);
-					} 
-				} else { // 출시 연도:X 상영등급:O 상영시간:O between ... and .... 불필요
-					if(rating == null || rating.length == 5) {
-						sql = "SELECT * FROM film WHERE title like ?";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-					} else if(rating.length == 4) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?, ?)";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-						stmt.setString(5, rating[3]);
-					} else if(rating.length == 3) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?, ?)";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-						stmt.setString(4, rating[2]);
-					} else if(rating.length == 2) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?, ?)";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-						stmt.setString(3, rating[1]);
-					} else if(rating.length == 1) {
-						sql = "SELECT * FROM film WHERE title like ?"
-								+ " AND rating IN (?)";
-						stmt = conn.prepareStatement(sql);
-						stmt.setString(1, "%"+searchTitle+"%");
-						stmt.setString(2, rating[0]);
-					} 
+			stmt= conn.prepareStatement(sql);
+			if(rating != null) {
+				for(int i = 0; i < rating.length; i += 1) {
+					stmt.setString(i + 1, rating[i]);
 				}
 			}
 			rs = stmt.executeQuery();
@@ -266,17 +164,27 @@ public class FilmDao {
 			e.printStackTrace();
 		} finally {
 			try {
-				rs.close();
-				stmt.close();
 				conn.close();
+				stmt.close();
+				rs.close();
 			} catch(Exception e) {
 				e.printStackTrace();
 			}
 		}
 		
+		
+		
+		/*
+		rating == null || rating.length == 5 
+		SELECT * FROM film 
+		
+		rating.length == 4
+		SELECT * FROM film WHERE rating IN (?, ?, ?, ?)
+		 */
+		
 		return list;
 	}
-
+	
 	
 	
 	// sort : asc /desc | col : 컬럼명
@@ -377,7 +285,6 @@ public class FilmDao {
 			stmt.setString(2, "%" + searchWord + "%");
 			
 			rs = stmt.executeQuery();
-			System.out.println("FilmDao:"+rs);
 			while(rs.next()) { // 데이터 많으니까 if xxx
 				Film film = new Film();
 				film.setFilmId(rs.getInt("filmId"));
